@@ -156,21 +156,170 @@ export function createRoutesFromChildren(children) {
   const routes = [];
   React.Children.forEach(children, (child) => {
     let childReactElement = child;
-    if (childReactElement?.props?.element) {
-      const route = {
+    let route;
+    if (childReactElement.props.element) {
+      route = {
         element: childReactElement.props.element,
         path: childReactElement.props.path,
       };
-      routes.push(route);
     }
+    // 處理嵌套的 <Route><Route>XXX</Route><Route>
+    if (childReactElement.props.children) {
+      route.children = createRoutesFromChildren(
+        childReactElement.props.children
+      );
+    }
+    routes.push(route);
   });
 
   return routes;
 }
+
 // src/mini-react-router/Route.js
 export function Route() {
   return <div>Route</div>;
 }
+
+// src/mini-react-router/hooks.js
+
+export function useRoutes(routes) {
+  const pathname = window.location.pathname;
+  return routes.map((route) => {
+    // TODO: 嵌套路由
+    const match = pathname.startsWith(route.path);
+    return match ? route.element : null;
+  });
+}
 ```
 
-### 加入 history
+### 路由切換
+
+```tsx
+function App() {
+  return (
+    <div className="App">
+      <Router>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="product" element={<Product />} />
+          </Route>
+        </Routes>
+      </Router>
+    </div>
+  );
+}
+// > src/pages/Layout.tsx
+import { Link } from "../mini-react-router";
+
+export default function Layout() {
+  return (
+    <div>
+      Layout
+      <Link to="/">Home</Link>
+      <Link to="/product">Product</Link>
+      {/* <Outlet /> */}
+    </div>
+  );
+}
+// src/mini-react-router/Link.js
+import { useNavigator } from "./hooks";
+
+export function Link({ to, children }) {
+  // TODO: useNavigator 結合 history 拿到 push 方法
+  const navigate = useNavigator();
+  const handler = (e) => {
+    e.preventDefault();
+    // TODO: 路由跳轉
+  };
+
+  return (
+    <a href={to} onClick={handler}>
+      {children}
+    </a>
+  );
+}
+```
+
+在寫 `useNavigator` 拿 history 之前，要先思考，BrowserRouter 和 HashRouter 都是根組件，實現原理不同。我們要拿到的是 Browser 的 history！
+
+回到 `src/mini-react-router/BrowserRouter.js`
+
+```tsx
+import React, { useRef } from "react";
+import { Router } from "./Router";
+// 這邊拿源碼使用，涉及兼容性，ie, chrome 不一樣
+// 執行後會回傳 history 的擴充
+import { createBrowserHistory } from "./history.ts";
+
+export function BrowserRouter({ children }) {
+  const historyRef = useRef();
+
+  // 避免每次都重新創造
+  if (!historyRef.current) {
+    historyRef.current = createBrowserHistory();
+  }
+  // 做了一個 Router 組件，可以和 HashRouter 共用
+  // 用 context 傳遞 history
+  return <Router navigator={historyRef.current}>{children}</Router>;
+}
+```
+
+> src/mini-react-router/Context.js
+
+```ts
+import { createContext } from "react";
+
+const NavigationContext = createContext();
+
+export { NavigationContext };
+```
+
+> src/mini-react-router/Router.js
+
+```tsx
+import { useMemo } from "react";
+import { NavigationContext } from "./Context";
+
+// 可以給 HashRouter 和 BrowserRouter 共用
+// navigator 就是 history
+export function Router({ navigator, children }) {
+  let navigationContext = useMemo(() => navigator, [navigator]);
+
+  return (
+    <NavigationContext.Provider value={navigationContext}>
+      {children}
+    </NavigationContext.Provider>
+  );
+}
+```
+
+> src/mini-react-router/hooks.js
+
+```ts
+export function useNavigator() {
+  // 只關心跳轉，但要知道現在是 BrowserRouter || HashRouter ，才知道可不可以用 history
+  const navigator = useContext(NavigationContext);
+  return navigator.push;
+}
+```
+
+這個時候，`Link` 就可以透過 `useNavigator` 拿到 history 了
+
+```tsx
+import { useNavigator } from "./hooks";
+
+export function Link({ to, children }) {
+  const navigate = useNavigator();
+  const handler = (e) => {
+    e.preventDefault();
+    navigate(to);
+  };
+
+  return (
+    <a href={to} onClick={handler}>
+      {children}
+    </a>
+  );
+}
+```

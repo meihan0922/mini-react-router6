@@ -1,4 +1,5 @@
-import { Link, Outlet } from "react-router-dom";
+// import { Link, Outlet } from "react-router-dom";
+import { Link } from "../mini-react-router";
 
 export default function Layout() {
   return (
@@ -6,7 +7,7 @@ export default function Layout() {
       Layout
       <Link to="/">Home</Link>
       <Link to="/product">Product</Link>
-      <Outlet />
+      {/* <Outlet /> */}
     </div>
   );
 }
