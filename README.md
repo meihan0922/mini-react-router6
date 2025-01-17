@@ -138,7 +138,7 @@ React router 提供兩種方法來聲明路由
 ```
 
 ```tsx
-// src/mini-react-router/BrowserRouter.js
+// src/mini-react-router/BrowserRouter.jsx
 export function BrowserRouter({ children }) {
   return <>{children}</>;
 }
@@ -175,7 +175,7 @@ export function createRoutesFromChildren(children) {
   return routes;
 }
 
-// src/mini-react-router/Route.js
+// src/mini-react-router/Route.jsx
 export function Route() {
   return <div>Route</div>;
 }
@@ -222,7 +222,7 @@ export default function Layout() {
     </div>
   );
 }
-// src/mini-react-router/Link.js
+// src/mini-react-router/Link.jsx
 import { useNavigator } from "./hooks";
 
 export function Link({ to, children }) {
@@ -243,7 +243,7 @@ export function Link({ to, children }) {
 
 在寫 `useNavigator` 拿 history 之前，要先思考，BrowserRouter 和 HashRouter 都是根組件，實現原理不同。我們要拿到的是 Browser 的 history！
 
-回到 `src/mini-react-router/BrowserRouter.js`
+回到 `src/mini-react-router/BrowserRouter.jsx`
 
 ```tsx
 import React, { useRef } from "react";
@@ -260,8 +260,12 @@ export function BrowserRouter({ children }) {
     historyRef.current = createBrowserHistory();
   }
   // 做了一個 Router 組件，可以和 HashRouter 共用
-  // 用 context 傳遞 history
-  return <Router navigator={historyRef.current}>{children}</Router>;
+  // 用 context 傳遞 history，順便做 location
+  return (
+    <Router navigator={historyRef.current} location={state.location}>
+      {children}
+    </Router>
+  );
 }
 ```
 
@@ -275,7 +279,7 @@ const NavigationContext = createContext();
 export { NavigationContext };
 ```
 
-> src/mini-react-router/Router.js
+> src/mini-react-router/Router.jsx
 
 ```tsx
 import { useMemo } from "react";
@@ -299,8 +303,13 @@ export function Router({ navigator, children }) {
 ```ts
 export function useNavigator() {
   // 只關心跳轉，但要知道現在是 BrowserRouter || HashRouter ，才知道可不可以用 history
-  const navigator = useContext(NavigationContext);
+  const { navigator } = useContext(NavigationContext);
   return navigator.push;
+}
+// 順便處理 location
+export function useLocation() {
+  const { location } = useContext(NavigationContext);
+  return location;
 }
 ```
 
@@ -323,3 +332,137 @@ export function Link({ to, children }) {
   );
 }
 ```
+
+把 `useRoutes` 內的 location 替換成 `useLocation` 即可。
+
+### 路由渲染
+
+要實現不管 `<Route>` 嵌套有多深，都可以渲染出 `子<Route>` 的 element
+
+比方 `<Layout/>` 就可以透過呼叫 `<Outlet/>` 渲染出對應的 `<Home/>` 或是 `<Product/>`
+
+```tsx
+<div className="App">
+  <Router>
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/product" element={<Product />} />
+      </Route>
+    </Routes>
+  </Router>
+</div>
+```
+
+```tsx
+export default function Layout() {
+  return (
+    <div>
+      Layout
+      <Link to="/">Home</Link>
+      <Link to="/product">Product</Link>
+      <Outlet />
+    </div>
+  );
+}
+```
+
+這要怎麼做呢？而且 `<Layout/>` ，如果又嵌套子組件，更深層使用 `<Outlet/>` 也必須可行！
+
+先想到跨組件渲染，會用到 context
+
+> src/mini-react-router/Context.js
+
+```tsx
+const NavigationContext = createContext();
+const RouteContext = createContext();
+export { NavigationContext, RouteContext };
+```
+
+在 `<Outlet/>` 中使用 `useOutlet`
+
+```tsx
+// src/mini-react-router/Outlet.jsx
+export function Outlet() {
+  return useOutlet();
+}
+// src/mini-react-router/hooks.jsx
+export function useOutlet() {
+  const { outlet } = useContext(RouteContext);
+  return outlet;
+}
+```
+
+現在要看 `<RouteContext.Provider/>` 要加在哪裡，
+我們會在 value 存 element，在 `Routes` 中會使用 `createRoutesFromChildren` 拿到 children，並且遞迴處理成 `routes` 傳到 `useRoutes` 中，比對路徑。
+
+比對路徑的同時，應該可以同時處理 context
+
+```tsx
+export function useRoutes(routes) {
+  const location = useLocation();
+  const pathname = location.pathname;
+  return routes.map((route) => {
+    // TODO: 嵌套路由
+    const match = pathname.startsWith(route.path);
+
+    return match
+      ? route.children
+        ? route.children.map((r) => {
+            // TODO: 嵌套的 path 拼裝
+            let matchChildRoute = normalizePathname(r.path) === pathname;
+            return (
+              matchChildRoute && (
+                <RouteContext.Provider value={{ outlet: r.element }}>
+                  {route.element !== undefined ? route.element : <Outlet />}
+                </RouteContext.Provider>
+              )
+            );
+          })
+        : route.element
+      : null;
+  });
+}
+
+// src/mini-react-router/utils.js
+// 處理開頭和末尾多個連續的 /，變成單個
+export const normalizePathname = (path) => {
+  return path.replace(/\/+$/, "").replace(/^\/*/, "/");
+};
+```
+
+現在已經完成取值了，但畫面還沒有連動 react 重新渲染！
+
+```tsx
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { Router } from "./Router";
+// 涉及兼容性，ie, chrome 不一樣，這邊拿源碼使用
+import { createBrowserHistory } from "./history.ts";
+
+export function BrowserRouter({ children }) {
+  const historyRef = useRef();
+
+  // 避免每次都重新創造
+  if (!historyRef.current) {
+    historyRef.current = createBrowserHistory({ window, v5Compat: true });
+  }
+  // location 變更就表示要重新渲染
+  const [state, setState] = useState({ location: historyRef.current.location });
+
+  // 執行的時機是 DOM 變更後立刻執行，
+  // 如果是 useEffect 延後執行，會先行渲染到畫面上
+  useLayoutEffect(() => {
+    historyRef.current.listen((p) => {
+      setState(p);
+    }); // 會監聽變化，回傳新的 location，去做 setState
+  }, []);
+
+  return (
+    <Router navigator={historyRef.current} location={state.location}>
+      {children}
+    </Router>
+  );
+}
+```
+
+這樣就完成路由渲染了！
