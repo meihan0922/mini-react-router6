@@ -466,3 +466,127 @@ export function BrowserRouter({ children }) {
 ```
 
 這樣就完成路由渲染了！
+
+### 動態路由 matchRoutes，修改 map 錯誤，實現 useParams
+
+現在打開來看會報關於 map key 錯誤，原因是 `useRoutes` 當中有 map children ，卻沒有用到 key。
+但其實這樣寫也不太好，因為他們實際上是嵌套的，所以用 reduce 堆疊組成一個 dom 結構才是對的。
+這時候要重新處理 routes 參數。
+使用源碼當中的 `matchRoutes` ，專門處理 flat 拍平，
+回傳拍平後的結構
+
+```js
+// http://localhost:3000/product/123詳情頁
+[
+  {
+    params: { id: "123詳情頁" },
+    pathname: "/",
+    pathnameBase: "/",
+    route:{
+      children:(2) [{…}, {…}], // Home, Product
+      element:{…}, // Layout
+      path:"/"
+    },
+  },
+  {
+    params: { id: "123詳情頁" },
+    pathname: "/product",
+    pathnameBase: "/product",
+    route:{
+      children:(1) [{…}], // ProductDetail
+      element:{…}, // Product
+      path:"/product"
+    },
+  },
+  {
+    params: { id: "123詳情頁" },
+    pathname: "/product/123詳情頁",
+    pathnameBase: "/product/123詳情頁",
+    route:{
+      element:{…}, // ProductDetail
+      path:"/product/123詳情頁"
+    },
+  },
+];
+```
+
+這邊就不實現 `matchRoutes` ，只要知道他是如何拍平的就好。
+最後拿到新的拍平後的結構，實現 `renderMatches` 取代原先 map 處理，要做出這樣的結構。
+
+```tsx
+<Layout>
+  <RouteContext.Provider>
+    <Product>
+      <RouteContext.Provider>
+        <ProductDetail />
+      </RouteContext.Provider>
+    </Product>
+  </RouteContext.Provider>
+</Layout>
+```
+
+```js
+function renderMatches(matches) {
+  if (matches === null) return null;
+  // 從內部開始做 reduce
+  // matches 也處理過 params，把它傳下去，提供給 useParams 使用
+  return matches.reduceRight((outlet, match) => {
+    return (
+      <RouteContext.Provider value={{ outlet, matches }}>
+        {match.route.element || outlet}
+      </RouteContext.Provider>
+    );
+  }, null);
+}
+export function useRoutes(routes) {
+  const location = useLocation();
+  const pathname = location.pathname;
+  // 遍歷 routes ，flat 拍平變成陣列結構
+  const matches = matchRoutes(routes, { pathname });
+  console.log("matches", matches);
+  return renderMatches(matches);
+}
+```
+
+就可以實現不報錯誤的動態路由了。
+
+```tsx
+<Router>
+  <Routes>
+    <Route path="/" element={<Layout />}>
+      <Route path="/" element={<Home />} />
+      <Route path="/product" element={<Product />}>
+        <Route path=":id" element={<ProductDetail />} />
+      </Route>
+    </Route>
+  </Routes>
+</Router>;
+
+// src/pages/Product.tsx
+import { Link, Outlet } from "../mini-react-router";
+
+export default function Product() {
+  return (
+    <div>
+      Product
+      <Link to="/product/123詳情頁">123詳情頁</Link>
+      <Outlet />
+    </div>
+  );
+}
+
+// src/pages/ProductDetail.tsx
+import { useParams } from "../mini-react-router";
+
+export default function ProductDetail() {
+  const { id } = useParams();
+  return <div>ProductDetail: {id}</div>;
+}
+
+// src/mini-react-router/hooks.jsx
+export function useParams() {
+  const { matches } = useContext(RouteContext);
+  const lastMatch = matches.at(-1);
+  return lastMatch ? lastMatch.params : {};
+}
+```

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "./mini-react-router";
 import Home from "./pages/Home";
 import Product from "./pages/Product";
 import Layout from "./pages/Layout";
+import ProductDetail from "./pages/ProductDetail";
 
 function App() {
   return (
@@ -11,7 +12,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route path="/" element={<Home />} />
-            <Route path="/product" element={<Product />} />
+            <Route path="/product" element={<Product />}>
+              <Route path=":id" element={<ProductDetail />} />
+            </Route>
           </Route>
         </Routes>
       </Router>

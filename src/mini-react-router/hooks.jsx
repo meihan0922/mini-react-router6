@@ -2,30 +2,26 @@ import { useContext } from "react";
 import { NavigationContext, RouteContext } from "./Context";
 import { Outlet } from "./Outlet";
 import { normalizePathname } from "./utils";
+import { matchRoutes } from "react-router-dom";
+
+function renderMatches(matches) {
+  if (matches === null) return null;
+  return matches.reduceRight((outlet, match) => {
+    return (
+      <RouteContext.Provider value={{ outlet, matches }}>
+        {match.route.element || outlet}
+      </RouteContext.Provider>
+    );
+  }, null);
+}
 
 export function useRoutes(routes) {
   const location = useLocation();
   const pathname = location.pathname;
-  return routes.map((route) => {
-    // TODO: 嵌套路由
-    const match = pathname.startsWith(route.path);
-
-    return match
-      ? route.children
-        ? route.children.map((r) => {
-            // TODO: 嵌套的 path 拼裝
-            let matchChildRoute = normalizePathname(r.path) === pathname;
-            return (
-              matchChildRoute && (
-                <RouteContext.Provider value={{ outlet: r.element }}>
-                  {route.element !== undefined ? route.element : <Outlet />}
-                </RouteContext.Provider>
-              )
-            );
-          })
-        : route.element
-      : null;
-  });
+  // 遍歷 routes ，flat 拍平變成陣列結構
+  const matches = matchRoutes(routes, { pathname });
+  console.log("matches", matches);
+  return renderMatches(matches);
 }
 
 export function useNavigator() {
@@ -47,4 +43,10 @@ export function useLocation() {
 export function useOutlet() {
   const { outlet } = useContext(RouteContext);
   return outlet;
+}
+
+export function useParams() {
+  const { matches } = useContext(RouteContext);
+  const lastMatch = matches.at(-1);
+  return lastMatch ? lastMatch.params : {};
 }
