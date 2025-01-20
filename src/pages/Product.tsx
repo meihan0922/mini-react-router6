@@ -1,4 +1,5 @@
-import { Link, Outlet } from "../mini-react-router";
+// import { Link, Outlet } from "../mini-react-router";
+import { Link, Outlet } from "react-router-dom";
 
 export default function Product() {
   return (

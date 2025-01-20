@@ -590,3 +590,157 @@ export function useParams() {
   return lastMatch ? lastMatch.params : {};
 }
 ```
+
+### 路由權限
+
+要怎麼實現需要權限才能訪問的頁面呢？
+
+先做一個假登入的物件，連接到 context (也可以用 redux，可以跨層級就好)
+
+```js
+// fakeAuth.js
+export const fakeAuthProvider = {
+  isAuthenticated: false,
+  signIn(cb) {
+    fakeAuthProvider.isAuthenticated = true;
+    setTimeout(cb, 100);
+  },
+  signOut(cb) {
+    fakeAuthProvider.isAuthenticated = false;
+    setTimeout(cb, 100);
+  },
+};
+
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const signIn = (newUser, cb) => {
+    setUser(newUser);
+    cb();
+  };
+
+  const signOut = (cb) => {
+    setUser(null);
+    cb();
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, signIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+```
+
+接著改變原來的 UI
+
+```jsx
+function App() {
+  return (
+    <div className="App">
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/product" element={<Product />}>
+                <Route path=":id" element={<ProductDetail />} />
+              </Route>
+              <Route
+                path="/user"
+                element={
+                  <NeedAuth>
+                    <User />
+                  </NeedAuth>
+                }
+              />
+              <Route path="/login" element={<Login />} />
+              <Route path="*" element={<NoMatch />} />
+            </Route>
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </div>
+  );
+}
+```
+
+預計做出 `User` `NeedAuth` `NoMatch` `Login` 組件
+
+```jsx
+function User() {
+  const auth = useAuth();
+  const navigator = useNavigate();
+  console.log("auth", auth);
+  return (
+    <div>
+      <h1>User: {auth.user?.username}</h1>
+      <button
+        onClick={() => {
+          auth.signOut(() => {
+            navigator("/login", { replace: true });
+          });
+        }}
+      >
+        logout
+      </button>
+    </div>
+  );
+}
+
+function NeedAuth({ children }) {
+  const auth = useAuth();
+  const location = useLocation();
+  if (!auth.user?.username) {
+    return <Navigate to="/login" state={{ from: location }} replace={true} />;
+  }
+
+  return (
+    <div>
+      <h1>需要權限</h1>
+      {children}
+    </div>
+  );
+}
+
+function NoMatch() {
+  return (
+    <div>
+      <h1>NoMatch</h1>
+    </div>
+  );
+}
+
+function Login() {
+  const auth = useAuth();
+  const navigator = useNavigate();
+  const from = useLocation().state?.from.pathname || "/";
+  const submit = (e) => {
+    const formData = new FormData(e.currentTarget);
+    const username = formData.get("username");
+    auth.signIn({ username }, () => navigator(from, { replace: true }));
+  };
+
+  if (auth.user?.username) {
+    return <Navigate to={from} />;
+  }
+  return (
+    <div>
+      <h1>Login</h1>
+      <form onSubmit={submit}>
+        <input type="text" name="username" />
+        <button type="submit">login</button>
+      </form>
+    </div>
+  );
+}
+```
+
+這樣就可以實現路由跳轉前，增加權限頁面阻擋
+
+### 實現 Navigate & useNavigate
