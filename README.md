@@ -223,11 +223,11 @@ export default function Layout() {
   );
 }
 // src/mini-react-router/Link.jsx
-import { useNavigator } from "./hooks";
+import { useNavigate } from "./hooks";
 
 export function Link({ to, children }) {
-  // TODO: useNavigator 結合 history 拿到 push 方法
-  const navigate = useNavigator();
+  // TODO: useNavigate 結合 history 拿到 push 方法
+  const navigate = useNavigate();
   const handler = (e) => {
     e.preventDefault();
     // TODO: 路由跳轉
@@ -241,7 +241,7 @@ export function Link({ to, children }) {
 }
 ```
 
-在寫 `useNavigator` 拿 history 之前，要先思考，BrowserRouter 和 HashRouter 都是根組件，實現原理不同。我們要拿到的是 Browser 的 history！
+在寫 `useNavigate` 拿 history 之前，要先思考，BrowserRouter 和 HashRouter 都是根組件，實現原理不同。我們要拿到的是 Browser 的 history！
 
 回到 `src/mini-react-router/BrowserRouter.jsx`
 
@@ -301,7 +301,7 @@ export function Router({ navigator, children }) {
 > src/mini-react-router/hooks.js
 
 ```ts
-export function useNavigator() {
+export function useNavigate() {
   // 只關心跳轉，但要知道現在是 BrowserRouter || HashRouter ，才知道可不可以用 history
   const { navigator } = useContext(NavigationContext);
   return navigator.push;
@@ -313,13 +313,13 @@ export function useLocation() {
 }
 ```
 
-這個時候，`Link` 就可以透過 `useNavigator` 拿到 history 了
+這個時候，`Link` 就可以透過 `useNavigate` 拿到 history 了
 
 ```tsx
-import { useNavigator } from "./hooks";
+import { useNavigate } from "./hooks";
 
 export function Link({ to, children }) {
-  const navigate = useNavigator();
+  const navigate = useNavigate();
   const handler = (e) => {
     e.preventDefault();
     navigate(to);
@@ -744,3 +744,37 @@ function Login() {
 這樣就可以實現路由跳轉前，增加權限頁面阻擋
 
 ### 實現 Navigate & useNavigate
+
+```jsx
+// src/mini-react-router/Navigate.jsx
+import { useEffect } from "react";
+import { useNavigate } from "./hooks";
+
+export function Navigate({ state, to, replace }) {
+  const navigate = useNavigate();
+
+  // 副作用
+  useEffect(() => {
+    navigate(to, { state, replace });
+  }, [state, to, replace, navigate]);
+
+  return null;
+}
+
+// src/mini-react-router/hooks.jsx
+export function useNavigate() {
+  // 只關心跳轉，但要知道現在是 BrowserRouter || HashRouter ，才知道可不可以用 history
+  const { navigator } = useContext(NavigationContext);
+  const navigate = useCallback(
+    (to, options) => {
+      if (typeof to === "number") {
+        navigator.go(to); // ex: -1
+        return;
+      }
+      (options.replace ? navigator.replace : navigator.push)(to, options.state);
+    },
+    [navigator]
+  );
+  return navigate;
+}
+```

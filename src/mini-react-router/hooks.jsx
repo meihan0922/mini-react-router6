@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useCallback, useContext } from "react";
 import { NavigationContext, RouteContext } from "./Context";
 import { Outlet } from "./Outlet";
 import { normalizePathname } from "./utils";
@@ -24,10 +24,20 @@ export function useRoutes(routes) {
   return renderMatches(matches);
 }
 
-export function useNavigator() {
+export function useNavigate() {
   // 只關心跳轉，但要知道現在是 BrowserRouter || HashRouter ，才知道可不可以用 history
   const { navigator } = useContext(NavigationContext);
-  return navigator.push;
+  const navigate = useCallback(
+    (to, options) => {
+      if (typeof to === "number") {
+        navigator.go(to); // ex: -1
+        return;
+      }
+      (options.replace ? navigator.replace : navigator.push)(to, options.state);
+    },
+    [navigator]
+  );
+  return navigate;
 }
 
 export function useLocation() {

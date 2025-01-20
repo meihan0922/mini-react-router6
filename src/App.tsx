@@ -1,12 +1,12 @@
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-// import { BrowserRouter as Router, Routes, Route } from "./mini-react-router";
-// import { useLocation } from "./mini-react-router/hooks";
+// import {
+//   BrowserRouter as Router,
+//   Routes,
+//   Route,
+//   useLocation,
+//   useNavigate,
+// } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "./mini-react-router";
+import { useLocation, useNavigate } from "./mini-react-router/hooks";
 import Home from "./pages/Home";
 import Product from "./pages/Product";
 import Layout from "./pages/Layout";

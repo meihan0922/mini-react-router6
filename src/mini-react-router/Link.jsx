@@ -1,7 +1,7 @@
-import { useNavigator } from "./hooks";
+import { useNavigate } from "./hooks";
 
 export function Link({ to, children }) {
-  const navigate = useNavigator();
+  const navigate = useNavigate();
   const handler = (e) => {
     e.preventDefault();
     navigate(to);
