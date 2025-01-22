@@ -1,19 +1,24 @@
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+  Navigate,
+} from "react-router-dom";
 // import {
 //   BrowserRouter as Router,
 //   Routes,
 //   Route,
-//   useLocation,
-//   useNavigate,
-// } from "react-router-dom";
-import { BrowserRouter as Router, Routes, Route } from "./mini-react-router";
-import { useLocation, useNavigate } from "./mini-react-router/hooks";
+//   Navigate,
+// } from "./mini-react-router";
+// import { useLocation, useNavigate } from "./mini-react-router/hooks";
 import Home from "./pages/Home";
 import Product from "./pages/Product";
 import Layout from "./pages/Layout";
 import ProductDetail from "./pages/ProductDetail";
 import { AuthProvider, useAuth } from "./fakeAuth";
-import { Navigate } from "react-router-dom";
-import { useContext } from "react";
+
 function App() {
   return (
     <div className="App">
@@ -61,7 +66,7 @@ function NeedAuth({ children }) {
 function User() {
   const auth = useAuth();
   const navigator = useNavigate();
-  console.log("auth", auth);
+  // console.log("auth", auth);
   return (
     <div>
       <h1>User: {auth.user?.username}</h1>
@@ -80,7 +85,7 @@ function User() {
 function Login() {
   const auth = useAuth();
   const navigator = useNavigate();
-  const from = useLocation().state?.from.pathname || "/";
+  const from = useLocation().state?.from?.pathname || "/";
   const submit = (e) => {
     const formData = new FormData(e.currentTarget);
     const username = formData.get("username");

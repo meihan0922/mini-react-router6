@@ -114,6 +114,8 @@ React router 提供兩種方法來聲明路由
 
 ## 實現
 
+只有實現最最簡單的架構，了解常用的組件的原理。
+
 ### 架構
 
 - mini-react-router
@@ -778,3 +780,42 @@ export function useNavigate() {
   return navigate;
 }
 ```
+
+### 實現 NavLink
+
+沒有實現在每個 props 上傳遞 `({ isActive, isPending, isTransitioning })=>{...}`，只是知道他在內部主要做了什麼。
+
+```tsx
+// to: 可以放相對或是絕對路徑
+export function NavLink({ to, children, ...rest }) {
+  // 得到完整路徑名 放入 match 比對資料
+  const resoved = useResolvedPath(to);
+  // 解析路徑名稱，看是否有對應的路由
+  // 源碼中 調用了 matchPath 來實現
+  const match = useMatch({
+    path: resoved.pathname,
+    end: true, // 是否匹配完整的路徑
+  });
+  console.log("matchmatch", match, to);
+  console.log("resovedresoved", resoved);
+  return (
+    <Link
+      to={to}
+      {...rest}
+      style={{
+        // 沒有匹配到是 null
+        color: match ? "red" : "black",
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
+```
+
+## 總結
+
+1. 通過 `<BrowserRouter>` 包裹了 『`<HashRouter>` 也可以使用的 `<Router>`』，通過`useLayoutEffect` 監聽歷史紀錄的變化，觸發整顆樹重新渲染！
+2. `<Router>` 其實就是 context，放入 history 和 location，`useNavigate` `useLocation` `useParams` 都是拿 context 的值，所以使用都會跟著渲染。
+3. `<Routes>` 處理了所有的子節點，做成一種 routes 的數據結構，處理嵌套，包含 `<Outlet>` 的使用，也是 reduce 包 Context，層層包裹後，拿到寄存的子節點。
+4. 關於路由權限，在頂層使用 Context 包裹，放入需要權限的全局狀態，包含登入登出，再需要權限的頁面上層放入 `<Navigate>` ，判斷是否有權限，否則進行跳轉。

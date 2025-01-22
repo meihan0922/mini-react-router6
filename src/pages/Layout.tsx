@@ -1,14 +1,14 @@
-// import { Link, Outlet } from "react-router-dom";
-import { Link, Outlet } from "../mini-react-router";
+import { Link, Outlet } from "react-router-dom";
+import { NavLink } from "../mini-react-router";
 
 export default function Layout() {
   return (
     <div>
       Layout
-      <Link to="/">Home</Link>
-      <Link to="/product">Product</Link>
-      <Link to="/user">User</Link>
-      <Link to="/login">Login</Link>
+      <NavLink to="/">Home</NavLink>
+      <NavLink to="/product">Product</NavLink>
+      <NavLink to="/user">User</NavLink>
+      <NavLink to="/login">Login</NavLink>
       <Outlet />
     </div>
   );
